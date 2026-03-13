@@ -16,7 +16,7 @@ from django.core.management import call_command
 
 if Block.objects.count() == 0:
     print('Seeding database with initial data...')
-    call_command('loaddata', '../seed_data.json')
+    call_command('loaddata', 'seed_data.json')
     print('Database seeded!')
 else:
     print('Database already has data, skipping seed.')
