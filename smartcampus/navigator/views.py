@@ -160,6 +160,20 @@ def login_view(request):
                     error = "Invalid password. Please try again."
             except Student.DoesNotExist:
                 error = "Registration number not found."
+        elif login_type == "admin":
+            username = request.POST.get("username", "").strip()
+            password = request.POST.get("password", "").strip()
+            from .models import EditorAdmin
+            try:
+                admin_user = EditorAdmin.objects.get(username=username)
+                if admin_user.password == password:
+                    request.session['role'] = 'admin'
+                    request.session['username'] = username
+                    return redirect('indoor_editor')
+                else:
+                    error = "Invalid admin password."
+            except EditorAdmin.DoesNotExist:
+                error = "Admin username not found."
         elif login_type == "visitor":
             request.session['role'] = 'visitor'
             return redirect('map')

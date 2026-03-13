@@ -199,7 +199,7 @@
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#4cc9f0';
                 ctx.font = 'bold 24px Inter, sans-serif';
-                ctx.fillText(`Floor ${floor.floor_number}`, 10, 40);
+                ctx.fillText(floor.floor_label, 10, 40);
                 const texture = new THREE.CanvasTexture(canvas);
                 const labelGeo = new THREE.PlaneGeometry(4, 1);
                 const labelMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
@@ -215,7 +215,7 @@
             const container = document.getElementById('floorButtons');
             container.innerHTML = data.floors.map((f, i) => `
                 <button class="floor-btn" onclick="showFloorRooms(${i})" id="fbtn${i}">
-                    🏗️ Floor ${f.floor_number} · ${f.rooms.length} rooms
+                    ${f.floor_label} · ${f.rooms.length} rooms
                 </button>
             `).join('');
         }

@@ -49,20 +49,20 @@
 </head>
 <body>
     <nav class="navbar">
-        <h3>🏗️ {{ building.name }} — Floor {{ floor.floor_number }}</h3>
+        <h3>🏗️ {{ building.name }} — {{ floor.floor_label }}</h3>
         <a href="/indoor/editor/">← Back to Campus Editor</a>
     </nav>
 
     <div class="container">
         <div class="info-card">
-            <h2>Floor {{ floor.floor_number }} Layout</h2>
+            <h2>{{ floor.floor_label }} Layout</h2>
             <p style="opacity:0.9;">Click on grid cells to add rooms. Click filled cells to edit or delete.</p>
         </div>
 
         <div class="card">
             <div class="floor-tabs">
                 {% for f in all_floors %}
-                <a href="/indoor/editor/floor/{{ f.id }}/" class="floor-tab {% if f.id == floor.id %}active{% endif %}">Floor {{ f.floor_number }}</a>
+                <a href="/indoor/editor/floor/{{ f.id }}/" class="floor-tab {% if f.id == floor.id %}active{% endif %}">{{ f.floor_label }}</a>
                 {% endfor %}
             </div>
 
@@ -72,7 +72,7 @@
                 <!-- 24 cells: 4 rows × 6 columns -->
             </div>
 
-            <button class="btn btn-save" onclick="saveAllRooms()">✅ Save Floor {{ floor.floor_number }} Layout</button>
+            <button class="btn btn-save" onclick="saveAllRooms()">✅ Save {{ floor.floor_label }} Layout</button>
         </div>
     </div>
 
@@ -200,7 +200,7 @@
             })
             .then(r => r.json())
             .then(data => {
-                alert(`✅ Saved ${data.count} rooms for Floor {{ floor.floor_number }}!`);
+                alert(`✅ Saved ${data.count} rooms for {{ floor.floor_label }}!`);
                 // Now save nav steps for each room (we need room IDs)
                 // Reload to get IDs
                 location.reload();

@@ -16,8 +16,14 @@ class BuildingFloor(models.Model):
     class Meta:
         ordering = ['floor_number']
 
+    @property
+    def floor_label(self):
+        if self.floor_number == 1:
+            return "Ground Floor"
+        return f"Floor {self.floor_number}"
+
     def __str__(self):
-        return f"{self.building.name} - Floor {self.floor_number}"
+        return f"{self.building.name} - {self.floor_label}"
 
 class Room(models.Model):
     floor = models.ForeignKey(BuildingFloor, on_delete=models.CASCADE, related_name='rooms')

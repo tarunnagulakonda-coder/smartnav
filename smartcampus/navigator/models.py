@@ -82,3 +82,10 @@ class WeeklySchedule(models.Model):
 
     def __str__(self):
         return f"{self.faculty.name} - {self.day} - P{self.period_number} - {self.status}"
+
+class EditorAdmin(models.Model):
+    username = models.CharField(max_length=50, unique=True)
+    password = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.username

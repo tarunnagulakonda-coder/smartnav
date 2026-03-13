@@ -1,12 +1,15 @@
 import json
 from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.views.decorators.csrf import csrf_exempt
 from .models import CampusBuilding, BuildingFloor, Room, NavigationStep
 
 
 def admin_editor_view(request):
     """Campus map editor - admin clicks to add buildings."""
+    if request.session.get('role') != 'admin':
+        return redirect('login')
+    
     buildings = CampusBuilding.objects.all()
     buildings_data = []
     for b in buildings:
@@ -26,6 +29,9 @@ def admin_editor_view(request):
 @csrf_exempt
 def api_add_building(request):
     """POST: Create building + auto-create floors."""
+    if request.session.get('role') != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
     if request.method != 'POST':
         return JsonResponse({'error': 'POST only'}, status=405)
 
@@ -55,6 +61,9 @@ def api_add_building(request):
 
 def floor_editor_view(request, floor_id):
     """Grid editor for placing room nodes on a floor."""
+    if request.session.get('role') != 'admin':
+        return redirect('login')
+    
     floor = get_object_or_404(BuildingFloor, pk=floor_id)
     building = floor.building
     all_floors = building.floors.all()
@@ -72,6 +81,9 @@ def floor_editor_view(request, floor_id):
 @csrf_exempt
 def api_save_rooms(request):
     """POST: Save room nodes for a floor."""
+    if request.session.get('role') != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+        
     if request.method != 'POST':
         return JsonResponse({'error': 'POST only'}, status=405)
 
@@ -96,6 +108,9 @@ def api_save_rooms(request):
 @csrf_exempt
 def api_save_nav_steps(request):
     """POST: Save navigation steps for a room."""
+    if request.session.get('role') != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+        
     if request.method != 'POST':
         return JsonResponse({'error': 'POST only'}, status=405)
 
@@ -138,6 +153,7 @@ def api_building_data(request, building_id):
             })
         floors_data.append({
             'floor_number': floor.floor_number,
+            'floor_label': floor.floor_label,
             'rooms': rooms_data,
         })
 
