@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Login - SmartCampus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #4361ee; --secondary: #3f37c9; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); padding: 50px 40px; width: 420px; max-width: 95%; animation: slideUp 0.5s ease; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+        .login-card h2 { font-weight: 700; color: #2b2d42; margin-bottom: 8px; }
+        .login-card p { color: #6c757d; margin-bottom: 30px; font-size: 0.95rem; }
+        .form-group { margin-bottom: 20px; }
+        label { font-weight: 600; color: #495057; font-size: 0.9rem; display: block; margin-bottom: 6px; }
+        input { width: 100%; padding: 12px 16px; border: 2px solid #e9ecef; border-radius: 10px; font-size: 1rem; transition: all 0.3s; font-family: 'Inter', sans-serif; }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.15); outline: none; }
+        .btn { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+        .btn:hover { background: var(--secondary); transform: translateY(-2px); box-shadow: 0 5px 20px rgba(67, 97, 238, 0.4); }
+        .error { background: #f8d7da; color: #721c24; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 0.9rem; font-weight: 500; }
+        .back-link { text-align: center; margin-top: 20px; }
+        .back-link a { color: var(--primary); text-decoration: none; font-weight: 500; font-size: 0.9rem; }
+        .back-link a:hover { text-decoration: underline; }
+        .icon { text-align: center; margin-bottom: 20px; font-size: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="icon">👨‍🏫</div>
+        <h2>Faculty Login</h2>
+        <p>Enter your Faculty ID and password to access the timetable system.</p>
+
+        {% if error %}
+        <div class="error">⚠️ {{ error }}</div>
+        {% endif %}
+
+        <form method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Faculty ID</label>
+                <input type="text" name="login_id" placeholder="e.g. DR.SUNIL" required>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="Enter password" required>
+            </div>
+            <button type="submit" class="btn">Sign In</button>
+        </form>
+        <div class="back-link">
+            <a href="{% url 'login' %}">← Back to Main Login</a>
+        </div>
+    </div>
+</body>
+</html>

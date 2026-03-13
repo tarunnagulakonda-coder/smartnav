@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Building - SmartCampus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #4361ee; --accent: #764ba2; --green: #28a745; --red: #dc3545; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0a0a1a; color: white; overflow: hidden; }
+        .top-bar { position: fixed; top: 0; left: 0; right: 0; padding: 15px 25px; background: rgba(10,10,26,0.9); backdrop-filter: blur(10px); display: flex; justify-content: space-between; align-items: center; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .top-bar h3 { font-weight: 700; color: #4cc9f0; }
+        .top-bar a { color: #adb5bd; text-decoration: none; font-weight: 500; font-size: 0.9rem; }
+        #canvas3d { width: 100vw; height: 100vh; display: block; }
+
+        /* Side Panel */
+        .side-panel { position: fixed; right: 0; top: 60px; bottom: 0; width: 350px; background: rgba(15,15,35,0.95); backdrop-filter: blur(10px); padding: 25px; overflow-y: auto; border-left: 1px solid rgba(255,255,255,0.08); z-index: 99; }
+        .floor-btn { display: block; width: 100%; padding: 12px; margin-bottom: 8px; background: rgba(67,97,238,0.15); border: 1px solid rgba(67,97,238,0.3); border-radius: 10px; color: #4cc9f0; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; text-align: left; font-family: 'Inter', sans-serif; }
+        .floor-btn:hover, .floor-btn.active { background: rgba(67,97,238,0.4); border-color: #4361ee; }
+        .room-list { margin-top: 15px; }
+        .room-item { padding: 10px 14px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
+        .room-item:hover { background: rgba(255,255,255,0.1); border-color: rgba(76,201,240,0.3); }
+        .room-item.selected { background: rgba(76,201,240,0.2); border-color: #4cc9f0; }
+        .room-name { font-weight: 600; font-size: 0.95rem; }
+        .room-pos { font-size: 0.8rem; color: #6c757d; }
+
+        .voice-panel { margin-top: 20px; padding: 15px; background: rgba(40,167,69,0.15); border-radius: 12px; border: 1px solid rgba(40,167,69,0.3); display: none; }
+        .voice-panel h5 { color: var(--green); margin-bottom: 10px; font-size: 0.95rem; }
+        .voice-step { padding: 6px 0; font-size: 0.85rem; color: #adb5bd; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .voice-step.speaking { color: #4cc9f0; font-weight: 600; }
+        .btn-voice { width: 100%; padding: 12px; background: var(--green); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; margin-top: 10px; transition: all 0.2s; }
+        .btn-voice:hover { background: #218838; }
+        .section-title { color: #6c757d; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; margin: 15px 0 8px; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h3>🏢 {{ building.name }} — 3D View</h3>
+        <a href="/indoor/editor/">← Back to Editor</a>
+    </div>
+
+    <canvas id="canvas3d"></canvas>
+
+    <div class="side-panel">
+        <div class="section-title">Floors</div>
+        <div id="floorButtons"></div>
+        
+        <div class="section-title" style="margin-top:20px;">Rooms</div>
+        <div class="room-list" id="roomList">
+            <div style="color:#6c757d;font-size:0.85rem;">Select a floor to see rooms</div>
+        </div>
+
+        <div class="voice-panel" id="voicePanel">
+            <h5>🗣️ Voice Navigation</h5>
+            <div id="voiceSteps"></div>
+            <button class="btn-voice" onclick="startVoiceNav()">▶ Start Voice Guide</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        const BUILDING_ID = {{ building_id }};
+        let buildingData = null;
+        let scene, camera, renderer, controls;
+        let floorMeshes = [];
+        let roomMeshes = [];
+        let selectedRoom = null;
+        let currentNavSteps = [];
+
+        // ====== THREE.JS SETUP ======
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a1a);
+
+            camera = new THREE.PerspectiveCamera(60, (window.innerWidth - 350) / window.innerHeight, 0.1, 1000);
+            camera.position.set(15, 20, 15);
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), antialias: true });
+            renderer.setSize(window.innerWidth - 350, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 3, 0);
+
+            // Lighting
+            const ambient = new THREE.AmbientLight(0x404060, 1.2);
+            scene.add(ambient);
+            const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+            directional.position.set(10, 20, 10);
+            scene.add(directional);
+
+            // Ground
+            const groundGeo = new THREE.PlaneGeometry(40, 40);
+            const groundMat = new THREE.MeshPhongMaterial({ color: 0x1a1a2e, side: THREE.DoubleSide });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -0.01;
+            scene.add(ground);
+
+            // Grid helper
+            const grid = new THREE.GridHelper(40, 40, 0x222244, 0x222244);
+            scene.add(grid);
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // ====== BUILD 3D FROM DATA ======
+        function build3DBuilding(data) {
+            // Clear old
+            floorMeshes.forEach(m => scene.remove(m));
+            roomMeshes.forEach(m => scene.remove(m));
+            floorMeshes = [];
+            roomMeshes = [];
+
+            const floorHeight = 3;
+            const floorWidth = 14;
+            const floorDepth = 8;
+
+            data.floors.forEach((floor, fi) => {
+                const y = fi * floorHeight;
+
+                // Floor slab
+                const slabGeo = new THREE.BoxGeometry(floorWidth, 0.3, floorDepth);
+                const slabMat = new THREE.MeshPhongMaterial({
+                    color: 0x2a2a4a,
+                    transparent: true,
+                    opacity: 0.6
+                });
+                const slab = new THREE.Mesh(slabGeo, slabMat);
+                slab.position.set(0, y, 0);
+                scene.add(slab);
+                floorMeshes.push(slab);
+
+                // Walls (wireframe)
+                const wallGeo = new THREE.BoxGeometry(floorWidth, floorHeight - 0.3, floorDepth);
+                const wallMat = new THREE.MeshPhongMaterial({
+                    color: 0x3a3a6a,
+                    transparent: true,
+                    opacity: 0.1,
+                    wireframe: false
+                });
+                const wall = new THREE.Mesh(wallGeo, wallMat);
+                wall.position.set(0, y + floorHeight / 2, 0);
+                scene.add(wall);
+                floorMeshes.push(wall);
+
+                // Wireframe
+                const wireGeo = new THREE.EdgesGeometry(wallGeo);
+                const wireMat = new THREE.LineBasicMaterial({ color: 0x4a4a8a, transparent: true, opacity: 0.3 });
+                const wireframe = new THREE.LineSegments(wireGeo, wireMat);
+                wireframe.position.copy(wall.position);
+                scene.add(wireframe);
+                floorMeshes.push(wireframe);
+
+                // Rooms
+                floor.rooms.forEach(room => {
+                    const roomW = 1.8, roomH = 2.2, roomD = 1.4;
+                    const rx = (room.x - 2.5) * 2.2;
+                    const rz = (room.y - 1.5) * 2.2;
+                    const ry = y + 0.15 + roomH / 2;
+
+                    const roomGeo = new THREE.BoxGeometry(roomW, roomH, roomD);
+                    const roomMat = new THREE.MeshPhongMaterial({
+                        color: 0x4361ee,
+                        transparent: true,
+                        opacity: 0.5,
+                        emissive: 0x1a2a6e,
+                        emissiveIntensity: 0.3
+                    });
+                    const roomMesh = new THREE.Mesh(roomGeo, roomMat);
+                    roomMesh.position.set(rx, ry, rz);
+                    roomMesh.userData = { room: room, floorNum: floor.floor_number };
+                    scene.add(roomMesh);
+                    roomMeshes.push(roomMesh);
+
+                    // Room edges
+                    const edgeGeo = new THREE.EdgesGeometry(roomGeo);
+                    const edgeMat = new THREE.LineBasicMaterial({ color: 0x4cc9f0 });
+                    const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+                    edges.position.copy(roomMesh.position);
+                    scene.add(edges);
+                    roomMeshes.push(edges);
+                });
+
+                // Floor label
+                const canvas = document.createElement('canvas');
+                canvas.width = 256; canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#4cc9f0';
+                ctx.font = 'bold 24px Inter, sans-serif';
+                ctx.fillText(`Floor ${floor.floor_number}`, 10, 40);
+                const texture = new THREE.CanvasTexture(canvas);
+                const labelGeo = new THREE.PlaneGeometry(4, 1);
+                const labelMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
+                const label = new THREE.Mesh(labelGeo, labelMat);
+                label.position.set(-8, y + 1.5, 0);
+                scene.add(label);
+                floorMeshes.push(label);
+            });
+        }
+
+        // ====== UI ======
+        function renderFloorButtons(data) {
+            const container = document.getElementById('floorButtons');
+            container.innerHTML = data.floors.map((f, i) => `
+                <button class="floor-btn" onclick="showFloorRooms(${i})" id="fbtn${i}">
+                    🏗️ Floor ${f.floor_number} · ${f.rooms.length} rooms
+                </button>
+            `).join('');
+        }
+
+        function showFloorRooms(floorIndex) {
+            document.querySelectorAll('.floor-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('fbtn' + floorIndex).classList.add('active');
+
+            const floor = buildingData.floors[floorIndex];
+            const list = document.getElementById('roomList');
+
+            if (floor.rooms.length === 0) {
+                list.innerHTML = '<div style="color:#6c757d;font-size:0.85rem;">No rooms on this floor</div>';
+                return;
+            }
+
+            list.innerHTML = floor.rooms.map((r, i) => `
+                <div class="room-item" id="room_${floorIndex}_${i}" onclick="selectRoom(${floorIndex}, ${i})">
+                    <div class="room-name">${r.name}</div>
+                    <div class="room-pos">Grid: (${r.x}, ${r.y})</div>
+                </div>
+            `).join('');
+        }
+
+        function selectRoom(floorIndex, roomIndex) {
+            document.querySelectorAll('.room-item').forEach(r => r.classList.remove('selected'));
+            document.getElementById(`room_${floorIndex}_${roomIndex}`).classList.add('selected');
+
+            const room = buildingData.floors[floorIndex].rooms[roomIndex];
+            selectedRoom = room;
+
+            // Highlight in 3D
+            roomMeshes.forEach(m => {
+                if (m.material && m.material.emissive) {
+                    m.material.opacity = 0.5;
+                    m.material.emissive.setHex(0x1a2a6e);
+                    m.material.emissiveIntensity = 0.3;
+                }
+            });
+
+            roomMeshes.forEach(m => {
+                if (m.userData && m.userData.room && m.userData.room.name === room.name) {
+                    m.material.opacity = 0.9;
+                    m.material.emissive.setHex(0x4cc9f0);
+                    m.material.emissiveIntensity = 0.8;
+
+                    camera.position.set(m.position.x + 8, m.position.y + 6, m.position.z + 8);
+                    controls.target.copy(m.position);
+                }
+            });
+
+            // Show voice nav
+            const panel = document.getElementById('voicePanel');
+            const stepsDiv = document.getElementById('voiceSteps');
+
+            if (room.nav_steps && room.nav_steps.length > 0) {
+                currentNavSteps = room.nav_steps;
+                stepsDiv.innerHTML = room.nav_steps.map((s, i) => `
+                    <div class="voice-step" id="vstep${i}">${i + 1}. ${s.instruction}</div>
+                `).join('');
+                panel.style.display = 'block';
+            } else {
+                panel.style.display = 'none';
+                currentNavSteps = [];
+            }
+        }
+
+        // ====== VOICE NAVIGATION ======
+        function speak(text) {
+            return new Promise(resolve => {
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.rate = 0.9;
+                utter.onend = resolve;
+                speechSynthesis.speak(utter);
+            });
+        }
+
+        async function startVoiceNav() {
+            if (currentNavSteps.length === 0) return;
+
+            // Welcome
+            await speak(`Welcome to ${buildingData.name}. Navigating to ${selectedRoom.name}.`);
+
+            for (let i = 0; i < currentNavSteps.length; i++) {
+                // Highlight step
+                document.querySelectorAll('.voice-step').forEach(s => s.classList.remove('speaking'));
+                document.getElementById('vstep' + i).classList.add('speaking');
+
+                await speak(currentNavSteps[i].instruction);
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            await speak(`You have arrived at ${selectedRoom.name}. Have a great day!`);
+        }
+
+        // ====== INIT ======
+        init3D();
+
+        fetch(`/indoor/api/building/${BUILDING_ID}/`)
+            .then(r => r.json())
+            .then(data => {
+                buildingData = data;
+                build3DBuilding(data);
+                renderFloorButtons(data);
+                if (data.floors.length > 0) showFloorRooms(0);
+            });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = (window.innerWidth - 350) / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth - 350, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Schedule - SmartCampus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #4361ee; --secondary: #3f37c9; --green: #28a745; --red: #dc3545; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f0f2f5; min-height: 100vh; padding: 30px 20px; }
+        .wizard { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.1); padding: 40px; max-width: 1100px; margin: 0 auto; }
+        .step-indicator { display: flex; gap: 10px; margin-bottom: 30px; max-width: 300px; }
+        .step { flex: 1; height: 6px; border-radius: 3px; background: #e9ecef; }
+        .step.active { background: var(--primary); }
+        h2 { font-weight: 700; color: #2b2d42; margin-bottom: 8px; }
+        p { color: #6c757d; margin-bottom: 25px; }
+        .table-container { overflow-x: auto; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: var(--primary); color: white; padding: 12px 8px; text-align: center; font-weight: 600; font-size: 0.85rem; }
+        th .time-sub { display: block; font-weight: 400; font-size: 0.7rem; opacity: 0.85; margin-top: 2px; }
+        td { padding: 8px 6px; text-align: center; border: 1px solid #e9ecef; }
+        td.day-cell { font-weight: 700; color: #2b2d42; text-align: left; padding-left: 15px; background: #f8f9fa; min-width: 110px; }
+        select { padding: 8px 4px; border: 2px solid #e9ecef; border-radius: 8px; font-family: 'Inter', sans-serif; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; width: 100%; min-width: 100px; }
+        select:focus { border-color: var(--primary); outline: none; }
+        select.in-class { border-color: var(--red); background: #fff5f5; color: var(--red); font-weight: 600; }
+        select.available { border-color: var(--green); background: #f0fff4; color: var(--green); font-weight: 600; }
+        .btn { display: inline-block; padding: 14px 40px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+        .btn:hover { background: var(--secondary); transform: translateY(-2px); box-shadow: 0 5px 20px rgba(67, 97, 238, 0.4); }
+        .actions { text-align: center; margin-top: 25px; }
+        .tip { background: #e8f0fe; padding: 12px 16px; border-radius: 10px; font-size: 0.85rem; color: var(--primary); margin-bottom: 20px; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="wizard">
+        <div class="step-indicator">
+            <div class="step active"></div>
+            <div class="step active"></div>
+            <div class="step active"></div>
+        </div>
+        <h2>📅 Step 3: Weekly Schedule</h2>
+        <p>Select your status for each period. Mark when you are <strong style="color: var(--red);">In Class</strong> or <strong style="color: var(--green);">Available</strong>.</p>
+        <div class="tip">💡 Tip: Students will see your real-time availability based on this schedule.</div>
+
+        <form method="POST">
+            {% csrf_token %}
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Day / Period</th>
+                            {% for pt in period_times %}
+                            <th>
+                                P{{ pt.period_number }}
+                                <span class="time-sub">{{ pt.start_time|time:"h:iA" }}-{{ pt.end_time|time:"h:iA" }}</span>
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day in days %}
+                        <tr>
+                            <td class="day-cell">{{ day }}</td>
+                            {% for pt in period_times %}
+                            <td>
+                                <select name="{{ day }}_P{{ pt.period_number }}" onchange="styleSelect(this)">
+                                    <option value="Available">✅ Available</option>
+                                    <option value="In Class">📕 In Class</option>
+                                </select>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="actions">
+                <button type="submit" class="btn">✅ Confirm & Save Timetable</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        function styleSelect(sel) {
+            if (sel.value === 'In Class') {
+                sel.className = 'in-class';
+            } else {
+                sel.className = 'available';
+            }
+        }
+        // Style on load
+        document.querySelectorAll('select').forEach(styleSelect);
+    </script>
+</body>
+</html>

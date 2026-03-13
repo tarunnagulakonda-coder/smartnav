@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Dashboard - SmartCampus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #4361ee; --secondary: #3f37c9; --green: #28a745; --red: #dc3545; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f0f2f5; min-height: 100vh; }
+        .navbar { background: white; padding: 15px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+        .navbar h3 { color: var(--primary); font-weight: 700; }
+        .navbar .right { display: flex; gap: 15px; align-items: center; }
+        .navbar .badge { background: #e8f0fe; color: var(--primary); padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 0.85rem; }
+        .btn-logout { padding: 8px 18px; border-radius: 8px; border: 1px solid #dc3545; color: #dc3545; text-decoration: none; font-weight: 500; font-size: 0.85rem; transition: all 0.2s; }
+        .btn-logout:hover { background: #dc3545; color: white; }
+        .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+        .welcome-card { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 16px; padding: 30px; margin-bottom: 25px; }
+        .welcome-card h2 { font-size: 1.6rem; margin-bottom: 5px; }
+        .welcome-card p { opacity: 0.9; }
+        .card { background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 25px; margin-bottom: 20px; }
+        .card h4 { margin-bottom: 15px; color: #2b2d42; font-weight: 700; }
+        .btn-create { display: inline-block; padding: 14px 30px; background: var(--primary); color: white; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 1rem; transition: all 0.2s; border: none; cursor: pointer; }
+        .btn-create:hover { background: var(--secondary); transform: translateY(-2px); box-shadow: 0 5px 20px rgba(67, 97, 238, 0.4); }
+        .btn-edit { display: inline-block; padding: 10px 20px; background: #6c757d; color: white; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 0.9rem; transition: all 0.2s; }
+        .btn-edit:hover { background: #5a6268; }
+        .no-tt { text-align: center; padding: 40px; }
+        .no-tt .icon { font-size: 4rem; margin-bottom: 15px; }
+        .no-tt p { color: #6c757d; margin-bottom: 20px; }
+        .timetable { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        .timetable th { background: var(--primary); color: white; padding: 10px 8px; text-align: center; font-weight: 600; }
+        .timetable td { padding: 10px 8px; text-align: center; border: 1px solid #e9ecef; }
+        .timetable tr:nth-child(even) { background: #f8f9fa; }
+        .status-available { color: var(--green); font-weight: 600; }
+        .status-inclass { color: var(--red); font-weight: 600; }
+        .period-header { font-size: 0.75rem; color: rgba(255,255,255,0.8); display: block; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h3>👨‍🏫 Faculty Dashboard</h3>
+        <div class="right">
+            <span class="badge">{{ faculty.name }}</span>
+            <a href="{% url 'login' %}" class="btn-logout">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="welcome-card">
+            <h2>Welcome, {{ faculty.name }}</h2>
+            <p>{{ faculty.department }} · {{ faculty.specialization }}</p>
+        </div>
+
+        {% if not has_timetable %}
+        <div class="card">
+            <div class="no-tt">
+                <div class="icon">📅</div>
+                <h4>No Timetable Configured</h4>
+                <p>Set up your weekly timetable so students can see your real-time availability.</p>
+                <a href="{% url 'timetable_config' %}" class="btn-create">✨ Create Timetable</a>
+            </div>
+        </div>
+        {% else %}
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h4 style="margin-bottom: 0;">📅 Your Weekly Timetable</h4>
+                <a href="{% url 'timetable_config' %}" class="btn-edit">✏️ Edit Timetable</a>
+            </div>
+            <p style="color: #6c757d; font-size: 0.9rem; margin-bottom: 15px;">{{ settings.working_days }} working days · {{ settings.periods_per_day }} periods/day</p>
+            
+            <div style="overflow-x: auto;">
+                <table class="timetable">
+                    <thead>
+                        <tr>
+                            <th>Day / Period</th>
+                            {% for pt in period_times %}
+                            <th>
+                                P{{ pt.period_number }}
+                                <span class="period-header">{{ pt.start_time|time:"h:i A" }} - {{ pt.end_time|time:"h:i A" }}</span>
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in timetable_rows %}
+                        <tr>
+                            <td style="font-weight: 600; text-align: left;">{{ row.day }}</td>
+                            {% for cell in row.cells %}
+                            <td>
+                                {% if cell == "Available" %}
+                                    <span class="status-available">✅ Free</span>
+                                {% elif cell == "In Class" %}
+                                    <span class="status-inclass">📕 Class</span>
+                                {% else %}
+                                    <span style="color: #adb5bd;">—</span>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

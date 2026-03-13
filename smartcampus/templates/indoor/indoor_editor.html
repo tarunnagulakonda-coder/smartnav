@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Layout Editor - SmartCampus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <style>
+        :root { --primary: #4361ee; --secondary: #3f37c9; --accent: #764ba2; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f0f2f5; }
+        .navbar { background: white; padding: 15px 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; z-index: 1001; position: relative; }
+        .navbar h3 { color: var(--accent); font-weight: 700; }
+        .navbar a { color: var(--primary); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+        .main { display: flex; height: calc(100vh - 60px); }
+        #map { flex: 1; }
+        .side-panel { width: 380px; background: white; box-shadow: -2px 0 15px rgba(0,0,0,0.05); padding: 25px; overflow-y: auto; display: none; flex-direction: column; gap: 15px; z-index: 1000; }
+        .side-panel.open { display: flex; }
+        .side-panel h4 { font-weight: 700; color: #2b2d42; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { font-weight: 600; color: #495057; font-size: 0.9rem; display: block; margin-bottom: 5px; }
+        .form-group input, .form-group select { width: 100%; padding: 10px 14px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 0.95rem; font-family: 'Inter', sans-serif; }
+        .form-group input:focus, .form-group select:focus { border-color: var(--primary); outline: none; }
+        .btn { padding: 12px 20px; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 0.95rem; transition: all 0.2s; width: 100%; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--secondary); transform: translateY(-1px); }
+        .btn-danger { background: #dc3545; color: white; margin-top: 8px; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-success { background: #28a745; color: white; }
+        .buildings-list { margin-top: 15px; }
+        .building-item { padding: 12px; background: #f8f9fa; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e9ecef; }
+        .building-item .name { font-weight: 600; color: #2b2d42; }
+        .building-item .info { font-size: 0.8rem; color: #6c757d; }
+        .building-item a { color: var(--primary); font-weight: 600; font-size: 0.85rem; text-decoration: none; }
+        .coords-display { font-size: 0.85rem; color: var(--accent); background: #f3f0ff; padding: 8px 12px; border-radius: 8px; font-weight: 500; }
+        .tip { background: #fff3cd; padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; color: #856404; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h3>🏗️ Campus Layout Editor</h3>
+        <a href="/">← Back to Home</a>
+    </nav>
+
+    <div class="main">
+        <div id="map"></div>
+        
+        <!-- Side Panel -->
+        <div class="side-panel" id="sidePanel">
+            <!-- Add Building Form -->
+            <div id="addBuildingForm">
+                <h4>📍 Add New Building</h4>
+                <div class="coords-display" id="coordsDisplay">Click on the map to select location</div>
+                <div class="form-group">
+                    <label>Building Name</label>
+                    <input type="text" id="buildingName" placeholder="e.g. CSE Block">
+                </div>
+                <div class="form-group">
+                    <label>Number of Floors</label>
+                    <input type="number" id="numFloors" value="2" min="1" max="10">
+                </div>
+                <button class="btn btn-primary" onclick="saveBuilding()">✅ Add Building</button>
+                <button class="btn btn-danger" onclick="closePanel()">✖ Cancel</button>
+            </div>
+
+            <!-- Building Details -->
+            <div id="buildingDetails" style="display:none;">
+                <h4 id="detailName"></h4>
+                <p style="color:#6c757d;font-size:0.9rem;" id="detailInfo"></p>
+                <div id="floorButtons"></div>
+                <a id="view3dLink" href="#" class="btn btn-success" style="display:inline-block;text-align:center;margin-top:10px;text-decoration:none;">🏢 View 3D Building</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Existing Buildings Panel -->
+    <div style="position:fixed;bottom:20px;left:20px;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:15px 20px;max-width:350px;max-height:300px;overflow-y:auto;z-index:1000;">
+        <h6 style="font-weight:700;color:#2b2d42;margin-bottom:10px;">📋 Buildings</h6>
+        <div class="tip" style="margin-bottom:10px;">💡 Click on the map to add a new building.</div>
+        <div class="buildings-list" id="buildingsList">Loading...</div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const CAMPUS_LAT = 18.06240;
+        const CAMPUS_LNG = 83.40638;
+        let clickedLat = null, clickedLng = null;
+        let clickMarker = null;
+        let existingBuildings = JSON.parse('{{ buildings_json|escapejs }}');
+
+        // Init map
+        const map = L.map('map').setView([CAMPUS_LAT, CAMPUS_LNG], 17);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 20
+        }).addTo(map);
+
+        // Building icon
+        const bldgIcon = L.divIcon({
+            className: '',
+            html: '<div style="background:#764ba2;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(0,0,0,0.3);"></div>',
+            iconSize: [18, 18], iconAnchor: [9, 9]
+        });
+
+        // Load existing buildings
+        function renderBuildingsList() {
+            const list = document.getElementById('buildingsList');
+            if (existingBuildings.length === 0) {
+                list.innerHTML = '<div style="color:#6c757d;font-size:0.85rem;">No buildings yet. Click map to add one!</div>';
+                return;
+            }
+            list.innerHTML = existingBuildings.map(b => `
+                <div class="building-item">
+                    <div>
+                        <div class="name">${b.name}</div>
+                        <div class="info">${b.num_floors} floor(s)</div>
+                    </div>
+                    <a href="#" onclick="showBuildingDetails(${b.id},'${b.name}',${b.num_floors})">Edit →</a>
+                </div>
+            `).join('');
+        }
+
+        // Add markers for existing buildings
+        existingBuildings.forEach(b => {
+            L.marker([b.lat, b.lng], {icon: bldgIcon}).addTo(map)
+                .bindPopup(`<b>${b.name}</b><br>${b.num_floors} floors<br><a href="/indoor/building/${b.id}/3d/">View 3D</a>`);
+        });
+        renderBuildingsList();
+
+        // Click map to add building
+        map.on('click', function(e) {
+            clickedLat = e.latlng.lat;
+            clickedLng = e.latlng.lng;
+
+            if (clickMarker) map.removeLayer(clickMarker);
+            clickMarker = L.marker([clickedLat, clickedLng]).addTo(map);
+
+            document.getElementById('coordsDisplay').textContent = `📍 ${clickedLat.toFixed(6)}, ${clickedLng.toFixed(6)}`;
+            document.getElementById('addBuildingForm').style.display = 'block';
+            document.getElementById('buildingDetails').style.display = 'none';
+            document.getElementById('sidePanel').classList.add('open');
+        });
+
+        function closePanel() {
+            document.getElementById('sidePanel').classList.remove('open');
+            if (clickMarker) map.removeLayer(clickMarker);
+        }
+
+        function saveBuilding() {
+            const name = document.getElementById('buildingName').value.trim();
+            const numFloors = parseInt(document.getElementById('numFloors').value);
+            if (!name || !clickedLat) return alert('Enter a name and click a location.');
+
+            fetch('/indoor/api/add-building/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name, lat: clickedLat, lng: clickedLng, num_floors: numFloors })
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(`✅ "${data.name}" added with ${data.num_floors} floors!`);
+                location.reload();
+            });
+        }
+
+        function showBuildingDetails(id, name, numFloors) {
+            document.getElementById('addBuildingForm').style.display = 'none';
+            document.getElementById('buildingDetails').style.display = 'block';
+            document.getElementById('sidePanel').classList.add('open');
+            document.getElementById('detailName').textContent = '🏢 ' + name;
+            document.getElementById('detailInfo').textContent = `${numFloors} floor(s) · Click a floor to edit rooms`;
+            document.getElementById('view3dLink').href = `/indoor/building/${id}/3d/`;
+
+            // Fetch floors
+            fetch(`/indoor/api/building/${id}/`)
+                .then(r => r.json())
+                .then(data => {
+                    const btns = document.getElementById('floorButtons');
+                    btns.innerHTML = data.floors.map(f => `
+                        <a href="/indoor/editor/floor/${f.floor_number}/?bid=${id}" style="display:block;padding:12px;background:#f0f4ff;border-radius:8px;margin-bottom:6px;text-decoration:none;color:#4361ee;font-weight:600;border:1px solid #d0d8ff;">
+                            🏗️ Floor ${f.floor_number} (${f.rooms.length} rooms)
+                        </a>
+                    `).join('');
+                });
+        }
+    </script>
+</body>
+</html>

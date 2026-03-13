@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floor Editor - SmartCampus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #4361ee; --secondary: #3f37c9; --accent: #764ba2; --green: #28a745; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f0f2f5; min-height: 100vh; }
+        .navbar { background: white; padding: 15px 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+        .navbar h3 { color: var(--accent); font-weight: 700; font-size: 1.1rem; }
+        .navbar a { color: var(--primary); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+        .container { max-width: 900px; margin: 25px auto; padding: 0 20px; }
+        .info-card { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 16px; padding: 20px 25px; margin-bottom: 20px; }
+        .info-card h2 { font-size: 1.3rem; }
+        .card { background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 25px; margin-bottom: 20px; }
+        .floor-tabs { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+        .floor-tab { padding: 8px 16px; background: #f0f4ff; border-radius: 8px; text-decoration: none; color: var(--primary); font-weight: 600; font-size: 0.85rem; border: 1px solid #d0d8ff; }
+        .floor-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .grid-container { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 20px 0; }
+        .grid-cell { aspect-ratio: 1; border: 2px dashed #d0d8ff; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 0.75rem; font-weight: 600; color: #6c757d; text-align: center; padding: 5px; word-break: break-word; background: #fafbff; }
+        .grid-cell:hover { border-color: var(--primary); background: #f0f4ff; transform: scale(1.03); }
+        .grid-cell.filled { background: linear-gradient(135deg, #667eea22, #764ba222); border: 2px solid var(--accent); color: var(--accent); }
+        .btn { padding: 12px 24px; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 0.95rem; transition: all 0.2s; }
+        .btn-save { background: var(--green); color: white; width: 100%; }
+        .btn-save:hover { background: #218838; transform: translateY(-1px); }
+        .tip { background: #e8f0fe; padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; color: var(--primary); font-weight: 500; margin-bottom: 15px; }
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 2000; }
+        .modal-overlay.open { display: flex; }
+        .modal-box { background: white; border-radius: 16px; padding: 30px; width: 350px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .modal-box h4 { margin-bottom: 15px; color: #2b2d42; }
+        .modal-box input { width: 100%; padding: 10px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1rem; margin-bottom: 10px; font-family: 'Inter', sans-serif; }
+        .modal-box input:focus { border-color: var(--primary); outline: none; }
+        .modal-btns { display: flex; gap: 8px; }
+        .modal-btns button { flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-family: 'Inter', sans-serif; border: none; }
+        .mbtn-save { background: var(--primary); color: white; }
+        .mbtn-cancel { background: #e9ecef; color: #495057; }
+        .mbtn-delete { background: #dc3545; color: white; }
+
+        /* Nav steps editor */
+        .nav-steps-area { margin-top: 10px; }
+        .nav-step-input { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+        .nav-step-input input { flex: 1; padding: 8px; border: 1px solid #e9ecef; border-radius: 6px; font-size: 0.85rem; font-family: 'Inter', sans-serif; }
+        .nav-step-input .step-num { font-weight: 700; color: var(--primary); min-width: 25px; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h3>🏗️ {{ building.name }} — Floor {{ floor.floor_number }}</h3>
+        <a href="/indoor/editor/">← Back to Campus Editor</a>
+    </nav>
+
+    <div class="container">
+        <div class="info-card">
+            <h2>Floor {{ floor.floor_number }} Layout</h2>
+            <p style="opacity:0.9;">Click on grid cells to add rooms. Click filled cells to edit or delete.</p>
+        </div>
+
+        <div class="card">
+            <div class="floor-tabs">
+                {% for f in all_floors %}
+                <a href="/indoor/editor/floor/{{ f.id }}/" class="floor-tab {% if f.id == floor.id %}active{% endif %}">Floor {{ f.floor_number }}</a>
+                {% endfor %}
+            </div>
+
+            <div class="tip">💡 Click any cell → enter room name → Save. The grid is 6×4 (24 possible rooms per floor).</div>
+
+            <div class="grid-container" id="grid">
+                <!-- 24 cells: 4 rows × 6 columns -->
+            </div>
+
+            <button class="btn btn-save" onclick="saveAllRooms()">✅ Save Floor {{ floor.floor_number }} Layout</button>
+        </div>
+    </div>
+
+    <!-- Room Name Modal -->
+    <div class="modal-overlay" id="roomModal">
+        <div class="modal-box">
+            <h4 id="modalTitle">Add Room</h4>
+            <input type="text" id="roomNameInput" placeholder="Room name, e.g. AI Lab">
+            
+            <div class="nav-steps-area" id="navStepsArea">
+                <label style="font-weight:600;font-size:0.85rem;color:#495057;display:block;margin-bottom:6px;">🗣️ Voice Navigation Steps (optional)</label>
+                <div id="navStepsContainer"></div>
+                <button onclick="addNavStep()" style="background:none;border:1px dashed #4361ee;color:#4361ee;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;margin-top:4px;">+ Add Step</button>
+            </div>
+
+            <div class="modal-btns" style="margin-top:15px;">
+                <button class="mbtn-save" onclick="confirmRoom()">Save</button>
+                <button class="mbtn-delete" id="deleteBtn" onclick="deleteRoom()" style="display:none;">Delete</button>
+                <button class="mbtn-cancel" onclick="closeModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GRID_COLS = 6, GRID_ROWS = 4;
+        let rooms = JSON.parse('{{ rooms_json|escapejs }}');
+        let currentCell = null;
+        let navStepCount = 0;
+
+        function buildGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            for (let y = 0; y < GRID_ROWS; y++) {
+                for (let x = 0; x < GRID_COLS; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+
+                    const room = rooms.find(r => r.x === x && r.y === y);
+                    if (room) {
+                        cell.classList.add('filled');
+                        cell.textContent = room.name;
+                    } else {
+                        cell.textContent = '+';
+                    }
+
+                    cell.onclick = () => openModal(x, y, room);
+                    grid.appendChild(cell);
+                }
+            }
+        }
+
+        function openModal(x, y, existingRoom) {
+            currentCell = { x, y };
+            document.getElementById('roomModal').classList.add('open');
+            document.getElementById('roomNameInput').value = existingRoom ? existingRoom.name : '';
+            document.getElementById('modalTitle').textContent = existingRoom ? 'Edit Room' : 'Add Room';
+            document.getElementById('deleteBtn').style.display = existingRoom ? 'block' : 'none';
+            document.getElementById('roomNameInput').focus();
+
+            // Clear nav steps
+            navStepCount = 0;
+            document.getElementById('navStepsContainer').innerHTML = '';
+            
+            if (existingRoom && existingRoom.nav_steps) {
+                existingRoom.nav_steps.forEach(s => {
+                    addNavStep(s.instruction);
+                });
+            } else {
+                // Add default steps for new rooms
+                addNavStep('Enter the building');
+                addNavStep('');
+            }
+        }
+
+        function addNavStep(text) {
+            navStepCount++;
+            const container = document.getElementById('navStepsContainer');
+            const div = document.createElement('div');
+            div.className = 'nav-step-input';
+            div.innerHTML = `<span class="step-num">${navStepCount}.</span><input type="text" class="nav-step-val" placeholder="e.g. Turn right, go straight..." value="${text || ''}">`;
+            container.appendChild(div);
+        }
+
+        function closeModal() {
+            document.getElementById('roomModal').classList.remove('open');
+            currentCell = null;
+        }
+
+        function confirmRoom() {
+            const name = document.getElementById('roomNameInput').value.trim();
+            if (!name) return alert('Enter a room name');
+
+            // Collect nav steps
+            const stepInputs = document.querySelectorAll('.nav-step-val');
+            const navSteps = [];
+            stepInputs.forEach(input => {
+                if (input.value.trim()) navSteps.push({ instruction: input.value.trim() });
+            });
+
+            const existing = rooms.findIndex(r => r.x === currentCell.x && r.y === currentCell.y);
+            if (existing >= 0) {
+                rooms[existing].name = name;
+                rooms[existing].nav_steps = navSteps;
+            } else {
+                rooms.push({ name, x: currentCell.x, y: currentCell.y, nav_steps: navSteps });
+            }
+            closeModal();
+            buildGrid();
+        }
+
+        function deleteRoom() {
+            rooms = rooms.filter(r => !(r.x === currentCell.x && r.y === currentCell.y));
+            closeModal();
+            buildGrid();
+        }
+
+        function saveAllRooms() {
+            // Save rooms
+            fetch('/indoor/api/save-rooms/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ floor_id: {{ floor.id }}, rooms: rooms.map(r => ({name: r.name, x: r.x, y: r.y})) })
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(`✅ Saved ${data.count} rooms for Floor {{ floor.floor_number }}!`);
+                // Now save nav steps for each room (we need room IDs)
+                // Reload to get IDs
+                location.reload();
+            });
+        }
+
+        buildGrid();
+    </script>
+</body>
+</html>

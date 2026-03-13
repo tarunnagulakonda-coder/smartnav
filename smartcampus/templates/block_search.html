@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Block Search - SmartCampus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; }
+        .search-container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .form-control:focus { box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2); border-color: #4361ee; }
+        .navbar-brand { font-weight: 700; color: #4361ee !important; }
+        .block-card { border: 1px solid #eee; border-radius: 8px; padding: 20px; transition: 0.2s; background: white; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+        .block-card:hover { box-shadow: 0 5px 15px rgba(0,0,0,0.08); transform: translateY(-2px); border-color: #ccc; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-white shadow-sm px-4">
+        <a class="navbar-brand" href="{% url 'dashboard' %}">← Back to Dashboard</a>
+        <span class="badge bg-primary px-3 py-2">Block Search</span>
+    </nav>
+    <div class="container mt-5">
+        <div class="search-container">
+            <h3 class="fw-bold mb-4 text-dark">Find Campus Buildings</h3>
+            <div class="input-group mb-5">
+                <input type="text" id="searchInput" class="form-control form-control-lg" placeholder="Search by Block Name, Department, Library..." autocomplete="off">
+            </div>
+
+            <div class="row" id="resultsGrid">
+                <!-- Filled by JS -->
+            </div>
+            
+            <div id="noResults" class="text-center text-muted" style="display: none; padding: 20px;">
+                No building found matching your search.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const resultsGrid = document.getElementById('resultsGrid');
+        const noResults = document.getElementById('noResults');
+
+        function fetchResults(query = '') {
+            fetch(`/api/blocks/?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    resultsGrid.innerHTML = '';
+                    if (data.length === 0) {
+                        noResults.style.display = 'block';
+                    } else {
+                        noResults.style.display = 'none';
+                        data.forEach(block => {
+                            const col = document.createElement('div');
+                            col.className = 'col-md-4 col-sm-6 mb-4';
+                            col.innerHTML = `
+                                <div class="block-card">
+                                    <div>
+                                        <h5 class="fw-bold text-dark">${block.name}</h5>
+                                        <p class="text-muted small mb-1">🏢 ${block.num_floors} Floor${block.num_floors > 1 ? 's' : ''}</p>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-3">
+                                        <a href="/map/?dest_lat=${block.lat}&dest_lng=${block.lng}&dest_name=${encodeURIComponent(block.name)}&building_id=${block.id}" class="btn btn-primary fw-bold flex-fill">📍 Navigate</a>
+                                        <a href="/indoor/building/${block.id}/3d/" class="btn btn-success fw-bold flex-fill">🏢 View 3D</a>
+                                    </div>
+                                </div>
+                            `;
+                            resultsGrid.appendChild(col);
+                        });
+                    }
+                });
+        }
+
+        // Trigger on typing with basic debounce
+        let timeout = null;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                fetchResults(e.target.value);
+            }, 300);
+        });
+
+        // Initial Load
+        fetchResults();
+    </script>
+</body>
+</html>
